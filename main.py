@@ -3,22 +3,59 @@ file then update that file with pretty output of championship standings"""
 
 import tkinter
 import tkinter.filedialog
+import openpyxl
 
 
-def get_file_path():
+def get_wb():
+    """Launches a file selection window. Returns a filepath string or raises a FileNotFoundError if user cancels"""
     rootwindow = tkinter.Tk()
     rootwindow.withdraw()
 
     file_path = tkinter.filedialog.askopenfilename()
     try:
         assert file_path != ''
-        return file_path
     except AssertionError:
         print("You did not select a valid file.")
         raise FileNotFoundError
+    try:
+        wb = openpyxl.load_workbook(file_path)
+    except:
+        print("error opening workbook")
+        raise NameError
+    return wb
+
+
+class champWB(object):
+
+    def __init__(self,wb: openpyxl.Workbook,rawstr:str, summarystr:str):
+        self.wb = wb
+        self.rawdatasheets = []
+        self.rawstr=rawstr
+        self.summarysheets = []
+        self.summarystr=summarystr
+        self.othersheets = []
+        lraw = len(rawstr)
+        lsummary = len(summarystr)
+        for sheet in wb.sheetnames:
+            if sheet[:lraw]==rawstr:
+                self.rawdatasheets.append(sheet)
+            elif sheet[:lsummary]==summarystr:
+                self.summarysheets.append(sheet)
+            else:
+                self.othersheets.append(sheet)
+
+    def writeout(self):
+        for sheet in self.rawdatasheets:
+            if sheet not in self.summarysheets:
+                self.wb.create_sheet(sheet.replace(self.rawstr,self.summarystr))
+        self.wb.save('out.xlsx')
+
+
 
 
 if __name__ == '__main__':
-    file_path = get_file_path()
-    print("about to print path")
-    print(file_path)
+    RAWNAMEBASE = "rawdata_"
+    SUMMARYNAMEBAE = "summary_"
+
+    the_wb = champWB(get_wb(),RAWNAMEBASE, SUMMARYNAMEBAE)
+    the_wb.writeout()
