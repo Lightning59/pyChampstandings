@@ -6,6 +6,7 @@ import tkinter.filedialog
 import openpyxl
 import openpyxl.worksheet
 import openpyxl.utils
+import openpyxl.styles
 
 
 def get_wb():
@@ -69,18 +70,30 @@ class champWB(object):
         output_width=2*numweeks
         for i in range(numweeks):
             output_width+=i+1
-        ws=self.wb.get_sheet_by_name(sheet)
+        ws=self.wb[sheet]
+        ws.merge_cells(start_row=1,start_column=1,end_row=1,end_column=output_width)
+
+        startweekcol=1
+        for i in range(1,numweeks+1):
+            ws.merge_cells(start_row=2,start_column=startweekcol,end_row=2,end_column=startweekcol+i+1)
+            if i!=1:
+                ws.merge_cells(start_row=3,start_column=startweekcol+2,end_row=3,end_column=startweekcol+1+i)
+            startweekcol+= i+2
+
         endletter=openpyxl.utils.cell.get_column_letter(output_width)
         endcell=endletter+str(output_height)
         graphic_range=ws['A1':endcell]
+        whiteFill = openpyxl.styles.PatternFill(start_color='00FFFF',end_color='00FFFF',fill_type='solid') # change to FFFFFF
+        for row in graphic_range:
+            for cell in row:
+                cell.fill=whiteFill
 
-
-        print('test')
-
-
-
-
-
+        thickblack=openpyxl.styles.Side(border_style='medium',color="000000")
+        thick_allsides_border=openpyxl.styles.Border(left=thickblack, right=thickblack, top= thickblack, bottom= thickblack)
+        for cell in graphic_range[0]:
+            cell.border=thick_allsides_border
+        for cell in graphic_range[1]:
+            cell.border = thick_allsides_border
 
 
     def writeout(self):
@@ -95,5 +108,5 @@ if __name__ == '__main__':
 
     the_wb = champWB(get_wb(),RAWNAMEBASE, SUMMARYNAMEBAE)
     the_wb.init_outsheets()
-    the_wb.format_outsheet("rawdata_Clio",2,5)
+    the_wb.format_outsheet("summary_Clio",3,5)
     the_wb.writeout()
