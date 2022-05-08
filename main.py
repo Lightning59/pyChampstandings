@@ -82,10 +82,15 @@ class champWB(object):
         endletter = openpyxl.utils.cell.get_column_letter(output_width)
         endcell = endletter + str(output_height)
         graphic_range = ws['A1':endcell]
+        self.graphic_range = graphic_range
+
+        # center and white background fill all cells
         whiteFill = openpyxl.styles.PatternFill(start_color='00FFFF', end_color='00FFFF',
                                                 fill_type='solid')  # change to FFFFFF
+        centerall = openpyxl.styles.alignment.Alignment(horizontal="center", vertical="center")
         for row in graphic_range:
             for cell in row:
+                cell.alignment = centerall
                 cell.fill = whiteFill
 
         thickblack = openpyxl.styles.Side(border_style='medium', color="000000")
@@ -93,9 +98,14 @@ class champWB(object):
         thick_allsides_border = openpyxl.styles.Border(left=thickblack, right=thickblack, top=thickblack,
                                                        bottom=thickblack)
         # First Two Headers for series and weeks - Set Borders
+
+        bold14pt = openpyxl.styles.Font(size=14, bold=True)
+        boldonly = openpyxl.styles.Font(bold=True)
         for cell in graphic_range[0]:
             cell.border = thick_allsides_border
+            cell.font = bold14pt
         for cell in graphic_range[1]:
+            cell.font = boldonly
             cell.border = thick_allsides_border
 
         # Cacluate indicies for week breaks
