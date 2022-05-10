@@ -8,6 +8,11 @@ import openpyxl.worksheet
 import openpyxl.utils
 import openpyxl.styles
 
+boldGold = openpyxl.styles.Font(bold=True,color="FFD700")
+BoldSilver = openpyxl.styles.Font(bold=True,color="C0C0C0")
+BoldBronze = openpyxl.styles.Font(bold=True,color="CD7F32")
+BlodBlack = openpyxl.styles.Font(bold=True)
+Droppedgrey = openpyxl.styles.Font(color="D3D3D3")
 
 def get_wb():
     """Launches a file selection window. Returns a filepath string or raises a FileNotFoundError if user cancels"""
@@ -182,6 +187,13 @@ class champWB(object):
         week00cells=[0]
         for i in range(1,numweeks):
             week00cells.append(week00cells[i-1]+2+i)
+
+        GoldFill = openpyxl.styles.PatternFill(start_color='FFD700', end_color='FFD700',
+                                                fill_type='solid')  # change to FFFFFF
+        SilverFill = openpyxl.styles.PatternFill(start_color='C0C0C0', end_color='C0C0C0',
+                                                fill_type='solid')  # change to FFFFFF
+        BronzeFill = openpyxl.styles.PatternFill(start_color='CD7F32', end_color='CD7F32',
+                                                fill_type='solid')  # change to FFFFFF
         week=1
         for cellindex in week00cells:
             graphicRange[1][cellindex].value="Week "+str(week)
@@ -191,9 +203,109 @@ class champWB(object):
             graphicRange[2][cellindex+1].value="Pts"
             graphicRange[2][cellindex+2].value="Finishes"
 
+            graphicRange[3][cellindex].fill=GoldFill
+            graphicRange[4][cellindex].fill=SilverFill
+            graphicRange[5][cellindex].fill=BronzeFill
+
     def writeout(self):
         self.wb.save('out.xlsx')
 
+class Series(object):
+    def __init__(self,sheet,dropweeks):
+        self.sheet=sheet
+        self.drivers=[]
+        self.weeks=[]
+        self.dropweeks=dropweeks
+        self.weeklysorteddirvers=[]
+
+    def readdrivers(self):
+        cvalue="start"
+        i=3
+        while True:
+            cvalue=self.sheet.cell(row=1,column=i).value
+            if cvalue==None:
+                break
+            d=Driver(cvalue,i)
+            assert len(self.weeks)!=0
+            d.readresults(self.sheet,len(self.weeks))
+            self.drivers.append(d)
+            i+=1
+
+    def readweeks(self):
+        cvalue="start"
+        i=2
+        while True:
+            cvalue=self.sheet.cell(row=i,column=1).value
+            if cvalue==None:
+                break
+            self.weeks.append(cvalue)
+            i+=1
+
+    def sortdrivers(self,week):
+        sordr=self.drivers.copy()
+        # sort by number of points for the week. If that is not enought then sort based on best dropped position going through all dropped positions as needed. - Need to still add Alpha drivers name last?
+        sordr=sorted(sordr,key=lambda y: [-y.weeklypoints[week]]+[y.weeklydropped[week][p][1] for p in range(len(y.weeklydropped))])
+        # I belieive this will throw errors if it trys to compare 'DNP' with an int. Need to add another int in the tuple where anything other than a number becomes 0
+        # or could make these poition object then define the __lt__ for position class?
+        self.weeklysorteddirvers.apppend(sordr)
+
+
+class Driver(object):
+    def __init__(self,name,col):
+        self.name=name
+        self.col=col
+        self.allresults=[]
+        self.thisweekresults=[]
+        self.weeklyresults=[]
+        self.weeklypoints=[]
+        self.weeklydropped=[]
+
+    def readresults(self,sheet,numweeks):
+        for i in range(2,numweeks+2):
+            self.allresults.append((i-1,sheet.cell(row=i,column=self.col).value))
+
+    def calcpoints_results_byweek(self,numweeks,dropweeks):
+        weekres=self.allresults[0:numweeks]
+        droppedres=[]
+
+        for i in range(len(weekres)):
+            if weekres[i][1] in POINTS.keys():
+                weekres[i]=(weekres[i][0],weekres[i][1],POINTS[weekres[i][1]])
+            else:
+                weekres[i] = (weekres[i][0], weekres[i][1], 0)
+
+
+        weekres = sorted(weekres,key=lambda y: y[2], reverse=True)
+
+        if numweeks>dropweeks:
+            for i in range(len(weekres)):
+                if i<(numweeks-dropweeks):
+                    weekres[i] = (weekres[i][0], weekres[i][1], weekres[i][2],1)
+                else:
+                    weekres[i] = (weekres[i][0], weekres[i][1], weekres[i][2], 0)
+                    droppedres.append((weekres[i][0], weekres[i][1], weekres[i][2], 0))
+        else:
+            weekres[0] = (weekres[0][0], weekres[0][1], weekres[0][2], 1)
+            for i in range(1,len(weekres)):
+                weekres[i] = (weekres[i][0], weekres[i][1], weekres[i][2], 0)
+                droppedres.append((weekres[i][0], weekres[i][1], weekres[i][2], 0))
+
+        #sort all the dropped results in order of quality as we may need them to break ties.
+        droppedres=sorted(droppedres,key=lambda y: (type(y[1])==str,y[1]))
+        self.weeklyresults.append(weekres)
+        self.weeklydropped.append(droppedres)
+        score=0
+        for item in weekres:
+            if item[3]==1:
+                score+=item[2]
+        self.weeklypoints.append(score)
+
+
+
+
+
+
+POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
 
 if __name__ == '__main__':
     RAWNAMEBASE = "rawdata_"
@@ -202,4 +314,10 @@ if __name__ == '__main__':
     the_wb = champWB(get_wb(), RAWNAMEBASE, SUMMARYNAMEBAE)
     the_wb.init_outsheets()
     the_wb.format_outsheet("summary_Clio", 3, 5)
+    x=Series(the_wb.wb['rawdata_Clio'],2)
+    x.readweeks()
+    x.readdrivers()
+    for driver in x.drivers:
+        driver.calcpoints_results_byweek(3,2)
+    x.sortdrivers(0)
     the_wb.writeout()
