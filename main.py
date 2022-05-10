@@ -61,6 +61,19 @@ class champWB(object):
                 self.wb.create_sheet(sheet.replace(self.rawstr, self.summarystr))
                 self.summarysheets.append(sheet)
 
+    def calc_graphicRange(self, sheet, numracers, numweeks):
+        # 3 lines worth of headers
+        output_height = 3 + numracers
+        # 2X num weeks covers driver and pts column each week then need to add positions
+        output_width = 2 * numweeks
+        for i in range(numweeks):
+            output_width += i + 1
+        ws = self.wb[sheet]
+        endletter = openpyxl.utils.cell.get_column_letter(output_width)
+        endcell = endletter + str(output_height)
+        graphic_range = ws['A1':endcell]
+        return graphic_range
+
     def format_outsheet(self, sheet: str, numweeks: int, numracers: int):
 
         # 3 lines worth of headers
@@ -82,7 +95,6 @@ class champWB(object):
         endletter = openpyxl.utils.cell.get_column_letter(output_width)
         endcell = endletter + str(output_height)
         graphic_range = ws['A1':endcell]
-        self.graphic_range = graphic_range
 
         # center and white background fill all cells
         whiteFill = openpyxl.styles.PatternFill(start_color='00FFFF', end_color='00FFFF',
@@ -160,6 +172,24 @@ class champWB(object):
                                                                         bottom=thinblack)
                 else:
                     graphic_range[j][i].border = openpyxl.styles.Border(top=thinblack, bottom=thinblack)
+
+        self.write_basic_headers(sheet,numweeks,numracers,sheet.replace("summary_",''))
+
+    def write_basic_headers(self, sheet: str, numweeks: int, numracers: int, seriesname: str):
+        graphicRange=self.calc_graphicRange(sheet,numracers,numweeks)
+        graphicRange[0][0].value=seriesname
+
+        week00cells=[0]
+        for i in range(1,numweeks):
+            week00cells.append(week00cells[i-1]+2+i)
+        week=1
+        for cellindex in week00cells:
+            graphicRange[1][cellindex].value="Week "+str(week)
+            week+=1
+
+            graphicRange[2][cellindex].value="Driver"
+            graphicRange[2][cellindex+1].value="Pts"
+            graphicRange[2][cellindex+2].value="Finishes"
 
     def writeout(self):
         self.wb.save('out.xlsx')
