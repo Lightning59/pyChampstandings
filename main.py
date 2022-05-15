@@ -11,8 +11,10 @@ import openpyxl.styles
 boldGold = openpyxl.styles.Font(bold=True,color="FFD700")
 BoldSilver = openpyxl.styles.Font(bold=True,color="C0C0C0")
 BoldBronze = openpyxl.styles.Font(bold=True,color="CD7F32")
-BlodBlack = openpyxl.styles.Font(bold=True)
+BoldBlack = openpyxl.styles.Font(bold=True)
 Droppedgrey = openpyxl.styles.Font(color="D3D3D3")
+POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
+STYLES={"1st":boldGold,"2nd":BoldSilver,"3rd":BoldBronze, 1:boldGold,2:BoldSilver,3:BoldBronze}
 
 def get_wb():
     """Launches a file selection window. Returns a filepath string or raises a FileNotFoundError if user cancels"""
@@ -118,7 +120,7 @@ class champWB(object):
         graphic_range = ws['A1':endcell]
 
         # center and white background fill all cells
-        whiteFill = openpyxl.styles.PatternFill(start_color='00FFFF', end_color='00FFFF',
+        whiteFill = openpyxl.styles.PatternFill(start_color='FFFFFF', end_color='FFFFFF',
                                                 fill_type='solid')  # change to FFFFFF
         centerall = openpyxl.styles.alignment.Alignment(horizontal="center", vertical="center")
         for row in graphic_range:
@@ -231,10 +233,20 @@ class champWB(object):
             index=week-1
             currcell = ws.cell(row=firstcellsVert,column=firstcellsLR[index]+1)
             vi=0
+            driverpos=1
             for driver in series.weeklysorteddirvers[index]:
                 currcell.value=driver.name
                 vi+=1
+                if driverpos in [1,2,3]:
+                    style=STYLES[driverpos]
+                else:
+                    style=BoldBlack
+                pointscell=currcell.offset(column=1)
+                pointscell.value=driver.weeklypoints[index]
+                pointscell.font=style
+
                 currcell = ws.cell(row=firstcellsVert+vi,column=firstcellsLR[index]+1)
+                driverpos+=1
 
 
 
@@ -292,7 +304,7 @@ class Series(object):
         sordr=self.drivers.copy()
         # sort by number of points for the week. If that is not enought then sort based on best dropped position going through all dropped positions as needed. - Need to still add Alpha drivers name last?
         sordr=sorted(sordr,key=lambda y: [-y.weeklypoints[week-1]]+[y.weeklydropped[week-1][p][1] for p in range(len(y.weeklydropped[week-1]))])
-        # currently sorting on DN* = 0, May need alphabetical drivers name added as final condition
+        # currently sorting on DN* = 10000, May need alphabetical drivers name added as final condition
         # or could make these poition object then define the __lt__ for position class?
         self.weeklysorteddirvers.append(sordr)
 
@@ -372,11 +384,6 @@ class Driver(object):
             else:
                 weekres[i] = (weekres[i][0], weekres[i][1], str(weekres[i][1]) + 'th', weekres[i][2], weekres[i][3])
 
-
-
-
-POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
-STYLES={"1st":boldGold}
 
 if __name__ == '__main__':
     RAWNAMEBASE = "rawdata_"
