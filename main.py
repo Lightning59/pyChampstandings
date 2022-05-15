@@ -48,7 +48,6 @@ class champWB(object):
         for sheet in wb.sheetnames:
             if sheet[:lraw] == rawstr:
                 self.rawdatasheets.append(sheet)
-                self.series.append(sheet[lraw:])
             elif sheet[:lsummary] == summarystr:
                 self.summarysheets.append(sheet)
             else:
@@ -59,12 +58,24 @@ class champWB(object):
             self.wb.remove(self.wb[sheet])
         self.summarysheets = []
 
+    def calc_series(self,dropweeks):
+        for sheetname in self.rawdatasheets:
+            sheet=self.wb[sheetname]
+            self.series.append(Series(sheet,dropweeks))
+
+        for series in self.series:
+            series.runcalc()
+
+
+
+
     def init_outsheets(self):
         '''create new blank summary sheets for each series.'''
         for sheet in self.rawdatasheets:
-            if sheet not in self.summarysheets:
-                self.wb.create_sheet(sheet.replace(self.rawstr, self.summarystr))
-                self.summarysheets.append(sheet)
+            newsummary=sheet.replace(self.rawstr, self.summarystr)
+            if newsummary not in self.summarysheets:
+                self.wb.create_sheet(newsummary)
+                self.summarysheets.append(newsummary)
 
     def calc_graphicRange(self, sheet, numracers, numweeks):
         # 3 lines worth of headers
@@ -218,6 +229,15 @@ class Series(object):
         self.dropweeks=dropweeks
         self.weeklysorteddirvers=[]
 
+    def runcalc(self):
+        self.readweeks()
+        self.readdrivers()
+        for driver in self.drivers:
+            for week in self.weeks:
+                driver.calcpoints_results_byweek(week, self.dropweeks)
+        for week in self.weeks:
+            self.sortdrivers(week)
+
     def readdrivers(self):
         cvalue="start"
         i=3
@@ -244,10 +264,10 @@ class Series(object):
     def sortdrivers(self,week):
         sordr=self.drivers.copy()
         # sort by number of points for the week. If that is not enought then sort based on best dropped position going through all dropped positions as needed. - Need to still add Alpha drivers name last?
-        sordr=sorted(sordr,key=lambda y: [-y.weeklypoints[week]]+[y.weeklydropped[week][p][1] for p in range(len(y.weeklydropped))])
-        # I belieive this will throw errors if it trys to compare 'DNP' with an int. Need to add another int in the tuple where anything other than a number becomes 0
+        sordr=sorted(sordr,key=lambda y: [-y.weeklypoints[week-1]]+[y.weeklydropped[week-1][p][1] for p in range(len(y.weeklydropped[week-1]))])
+        # currently sorting on DN* = 0, May need alphabetical drivers name added as final condition
         # or could make these poition object then define the __lt__ for position class?
-        self.weeklysorteddirvers.apppend(sordr)
+        self.weeklysorteddirvers.append(sordr)
 
 
 class Driver(object):
@@ -263,6 +283,7 @@ class Driver(object):
     def readresults(self,sheet,numweeks):
         for i in range(2,numweeks+2):
             self.allresults.append((i-1,sheet.cell(row=i,column=self.col).value))
+
 
     def calcpoints_results_byweek(self,numweeks,dropweeks):
         weekres=self.allresults[0:numweeks]
@@ -290,17 +311,33 @@ class Driver(object):
                 weekres[i] = (weekres[i][0], weekres[i][1], weekres[i][2], 0)
                 droppedres.append((weekres[i][0], weekres[i][1], weekres[i][2], 0))
 
+        # Tuple format at this point is (week,position,points for position,dropped?)
+        # make it (week,positionnumerical,postiion print,points for positoin, dropped)
+
+        self.create_printpositions(weekres)
+        self.create_printpositions(droppedres)
+
         #sort all the dropped results in order of quality as we may need them to break ties.
-        droppedres=sorted(droppedres,key=lambda y: (type(y[1])==str,y[1]))
+        droppedres=sorted(droppedres,key=lambda y: y[1])
         self.weeklyresults.append(weekres)
         self.weeklydropped.append(droppedres)
         score=0
         for item in weekres:
-            if item[3]==1:
-                score+=item[2]
+            if item[4]==1:
+                score+=item[3]
         self.weeklypoints.append(score)
 
-
+    def create_printpositions(self,weekres):
+        ''' take in list of Tuples format at this point is (week,position,points for position,dropped?)
+        make it list of tuples (week,positionnumerical,postiion print,points for positoin, dropped)'''
+        endingsdict={1:"st",2:"nd",3:"rd"}
+        for i in range(len(weekres)):
+            if type(weekres[i][1])==str:
+                weekres[i]=(weekres[i][0],1000,weekres[i][1],weekres[i][2],weekres[i][3])
+            elif weekres[i][1] in endingsdict.keys():
+                weekres[i] = (weekres[i][0], weekres[i][1], str(weekres[i][1])+endingsdict[weekres[i][1]], weekres[i][2], weekres[i][3])
+            else:
+                weekres[i] = (weekres[i][0], weekres[i][1], str(weekres[i][1]) + 'th', weekres[i][2], weekres[i][3])
 
 
 
@@ -313,11 +350,6 @@ if __name__ == '__main__':
 
     the_wb = champWB(get_wb(), RAWNAMEBASE, SUMMARYNAMEBAE)
     the_wb.init_outsheets()
+    the_wb.calc_series(2)
     the_wb.format_outsheet("summary_Clio", 3, 5)
-    x=Series(the_wb.wb['rawdata_Clio'],2)
-    x.readweeks()
-    x.readdrivers()
-    for driver in x.drivers:
-        driver.calcpoints_results_byweek(3,2)
-    x.sortdrivers(0)
     the_wb.writeout()
