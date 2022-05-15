@@ -16,6 +16,8 @@ Droppedgrey = openpyxl.styles.Font(color="e6e6e6")
 POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
 STYLES={"1st":boldGold,"2nd":BoldSilver,"3rd":BoldBronze, 1:boldGold,2:BoldSilver,3:BoldBronze}
 
+DROPPEDWEEKS=2
+
 def get_wb():
     """Launches a file selection window. Returns a filepath string or raises a FileNotFoundError if user cancels"""
     rootwindow = tkinter.Tk()
@@ -414,6 +416,6 @@ if __name__ == '__main__':
     SUMMARYNAMEBAE = "summary_"
 
     the_wb = champWB(get_wb(), RAWNAMEBASE, SUMMARYNAMEBAE)
-    the_wb.calc_series(2)
+    the_wb.calc_series(DROPPEDWEEKS)
     the_wb.init_outsheets()
     the_wb.writeout()
