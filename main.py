@@ -77,6 +77,11 @@ class champWB(object):
                 self.wb.create_sheet(newsummary)
                 self.summarysheets.append(newsummary)
 
+        for i in range(len(self.series)):
+            self.format_outsheet(self.summarysheets[i],self.series[i].getNumWeeks(),self.series[i].getNumDrivers())
+            self.write_data(self.summarysheets[i],self.series[i])
+
+
     def calc_graphicRange(self, sheet, numracers, numweeks):
         # 3 lines worth of headers
         output_height = 3 + numracers
@@ -189,15 +194,12 @@ class champWB(object):
                 else:
                     graphic_range[j][i].border = openpyxl.styles.Border(top=thinblack, bottom=thinblack)
 
+
         self.write_basic_headers(sheet,numweeks,numracers,sheet.replace("summary_",''))
 
     def write_basic_headers(self, sheet: str, numweeks: int, numracers: int, seriesname: str):
         graphicRange=self.calc_graphicRange(sheet,numracers,numweeks)
         graphicRange[0][0].value=seriesname
-
-        week00cells=[0]
-        for i in range(1,numweeks):
-            week00cells.append(week00cells[i-1]+2+i)
 
         GoldFill = openpyxl.styles.PatternFill(start_color='FFD700', end_color='FFD700',
                                                 fill_type='solid')  # change to FFFFFF
@@ -206,6 +208,7 @@ class champWB(object):
         BronzeFill = openpyxl.styles.PatternFill(start_color='CD7F32', end_color='CD7F32',
                                                 fill_type='solid')  # change to FFFFFF
         week=1
+        week00cells=self.calc_00_cells(numweeks)
         for cellindex in week00cells:
             graphicRange[1][cellindex].value="Week "+str(week)
             week+=1
@@ -213,13 +216,37 @@ class champWB(object):
             graphicRange[2][cellindex].value="Driver"
             graphicRange[2][cellindex+1].value="Pts"
             graphicRange[2][cellindex+2].value="Finishes"
-
+            #1st,2nd,3rd bacgournds
             graphicRange[3][cellindex].fill=GoldFill
             graphicRange[4][cellindex].fill=SilverFill
             graphicRange[5][cellindex].fill=BronzeFill
 
+    def write_data(self,sheet:str,series):
+        ws=self.wb[sheet]
+        numweeks=series.getNumWeeks()
+        firstcellsLR=self.calc_00_cells(numweeks)
+        firstcellsVert=4
+
+        for week in series.weeks:
+            index=week-1
+            currcell = ws.cell(row=firstcellsVert,column=firstcellsLR[index]+1)
+            vi=0
+            for driver in series.weeklysorteddirvers[index]:
+                currcell.value=driver.name
+                vi+=1
+                currcell = ws.cell(row=firstcellsVert+vi,column=firstcellsLR[index]+1)
+
+
+
     def writeout(self):
         self.wb.save('out.xlsx')
+
+    def calc_00_cells(self,numweeks):
+        week00cells = [0]
+        for i in range(1, numweeks):
+            week00cells.append(week00cells[i - 1] + 2 + i)
+        return week00cells
+
 
 class Series(object):
     def __init__(self,sheet,dropweeks):
@@ -268,6 +295,12 @@ class Series(object):
         # currently sorting on DN* = 0, May need alphabetical drivers name added as final condition
         # or could make these poition object then define the __lt__ for position class?
         self.weeklysorteddirvers.append(sordr)
+
+    def getNumWeeks(self):
+        return len(self.weeks)
+
+    def getNumDrivers(self):
+        return len(self.drivers)
 
 
 class Driver(object):
@@ -343,13 +376,13 @@ class Driver(object):
 
 
 POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
+STYLES={"1st":boldGold}
 
 if __name__ == '__main__':
     RAWNAMEBASE = "rawdata_"
     SUMMARYNAMEBAE = "summary_"
 
     the_wb = champWB(get_wb(), RAWNAMEBASE, SUMMARYNAMEBAE)
-    the_wb.init_outsheets()
     the_wb.calc_series(2)
-    the_wb.format_outsheet("summary_Clio", 3, 5)
+    the_wb.init_outsheets()
     the_wb.writeout()
