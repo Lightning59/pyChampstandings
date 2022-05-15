@@ -8,11 +8,11 @@ import openpyxl.worksheet
 import openpyxl.utils
 import openpyxl.styles
 
-boldGold = openpyxl.styles.Font(bold=True,color="FFD700")
-BoldSilver = openpyxl.styles.Font(bold=True,color="C0C0C0")
+boldGold = openpyxl.styles.Font(bold=True,color="ffc200")
+BoldSilver = openpyxl.styles.Font(bold=True,color="9a9a9a")
 BoldBronze = openpyxl.styles.Font(bold=True,color="CD7F32")
 BoldBlack = openpyxl.styles.Font(bold=True)
-Droppedgrey = openpyxl.styles.Font(color="D3D3D3")
+Droppedgrey = openpyxl.styles.Font(color="e6e6e6")
 POINTS={1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1}
 STYLES={"1st":boldGold,"2nd":BoldSilver,"3rd":BoldBronze, 1:boldGold,2:BoldSilver,3:BoldBronze}
 
@@ -244,10 +244,34 @@ class champWB(object):
                 pointscell=currcell.offset(column=1)
                 pointscell.value=driver.weeklypoints[index]
                 pointscell.font=style
+                self.print_positions(driver,week,pointscell)
+
+
 
                 currcell = ws.cell(row=firstcellsVert+vi,column=firstcellsLR[index]+1)
                 driverpos+=1
 
+    def print_positions(self,driver,week,startpos):
+        positions=driver.weeklyresults[week-1]
+        positions=sorted(positions, key= lambda y: y[0])
+        celltowrite=startpos.offset(column=1)
+        for pos in positions:
+            # if the position is a dropped result
+            if pos[4]==0:
+                style=Droppedgrey
+                celltowrite.font=style
+                celltowrite.value=pos[2]
+            else:
+                if pos[2] in STYLES.keys():
+                    style=STYLES[pos[2]]
+                    celltowrite.font=style
+                    celltowrite.value=pos[2]
+                else:
+                    style=BoldBlack
+                    celltowrite.font = style
+                    celltowrite.value = pos[2]
+
+            celltowrite=celltowrite.offset(column=1)
 
 
     def writeout(self):
