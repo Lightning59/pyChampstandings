@@ -16,7 +16,8 @@ DroppedGrey = openpyxl.styles.Font(color="e6e6e6")
 POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
 STYLES = {"1st": boldGold, "2nd": BoldSilver, "3rd": BoldBronze, 1: boldGold, 2: BoldSilver, 3: BoldBronze}
 
-DROPPED_WEEKS = 2
+DROPPED_WEEKS = 4
+
 
 
 def get_wb():
@@ -272,7 +273,17 @@ class ChampWorkBook(object):
             cell_to_write = cell_to_write.offset(column=1)
 
     def write_out(self):
-        self.wb.save('out.xlsx')
+        default_extension = ".xlsx"
+        default_filename = "out" + default_extension
+        file_types = [("Excel files", "*" + default_extension), ("All files", "*.*")]
+        file_path = tkinter.filedialog.asksaveasfilename(initialfile=default_filename, filetypes=file_types,
+                                                 defaultextension=default_extension)
+        try:
+            assert file_path != ''
+        except AssertionError:
+            print("You did not select a valid output file.")
+            raise FileNotFoundError
+        self.wb.save(file_path)
 
     def calc_00_cells(self, num_weeks):
         week00cells = [0]
