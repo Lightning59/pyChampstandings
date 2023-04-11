@@ -66,6 +66,8 @@ def get_wb() -> openpyxl.Workbook:
 class ChampWorkBook(object):
     """
     Championship wookbook object - An onpenpyxl workbook representing several championships
+
+    Holds a lot of formatting methods and the raw excel data
     """
 
     def __init__(self, wb: openpyxl.Workbook, raw_str: str, summary_str: str) -> None:
@@ -105,22 +107,42 @@ class ChampWorkBook(object):
             self.wb.remove(self.wb[sheet])
         self.summary_sheets = []
 
-    def calc_series(self, drop_weeks):
+    def calc_series(self, drop_weeks: int) -> None:
+        """
+        Run the calculation of all the basic series represented by the raw data sheets
+
+        Adds a series object based off of each sheet to the series list
+        then for each series in the list - tells that series to perform its calculation method.
+
+        :param drop_weeks: 0 or positive int for the number of weeks in a season to be dropped
+        :return: None - Alters State of the parent.
+        """
+
+        # Create a series object in the self series list for each raw sheet
         for sheet_name in self.raw_data_sheets:
             sheet = self.wb[sheet_name]
             self.series.append(Series(sheet, drop_weeks))
 
+        # run built in calculation on each of those series
         for series in self.series:
             series.runcalc()
 
-    def init_out_sheets(self):
-        """create new blank summary sheets for each series."""
+    def init_out_sheets(self) -> None:
+        """
+        create any missing blank summary sheets then format all sheets grid framework based on drivers and weeks raced
+        so far.
+
+        :return: Alters state - New blank sheets created with proper grid formatting
+        """
+
+        # check each raw sheet - create new summary sheet name -If that sheet doesn't already exist create it for real
         for sheet in self.raw_data_sheets:
             new_summary = sheet.replace(self.raw_str, self.summary_str)
             if new_summary not in self.summary_sheets:
                 self.wb.create_sheet(new_summary)
                 self.summary_sheets.append(new_summary)
 
+        # run each sheet through the grid printing functions so they have all their combined cells and grids set.
         for i in range(len(self.series)):
             self.format_out_sheet(self.summary_sheets[i], self.series[i].get_num_weeks(),
                                   self.series[i].get_num_drivers())
@@ -317,7 +339,7 @@ class ChampWorkBook(object):
         default_filename = "out" + default_extension
         file_types = [("Excel files", "*" + default_extension), ("All files", "*.*")]
         file_path = tkinter.filedialog.asksaveasfilename(initialfile=default_filename, filetypes=file_types,
-                                                 defaultextension=default_extension)
+                                                         defaultextension=default_extension)
         try:
             assert file_path != ''
         except AssertionError:
