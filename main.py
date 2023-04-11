@@ -8,48 +8,88 @@ import openpyxl.worksheet
 import openpyxl.utils
 import openpyxl.styles
 
+# Bold Gold for all counted 1st place finishes - Bold Silver second, Bold-Bronze third, Bold- Black - counted
+# non-podium finishes
 boldGold = openpyxl.styles.Font(bold=True, color="ffc200")
 BoldSilver = openpyxl.styles.Font(bold=True, color="9a9a9a")
 BoldBronze = openpyxl.styles.Font(bold=True, color="CD7F32")
 BoldBlack = openpyxl.styles.Font(bold=True)
+
+# Dull grey without bold for non-counting (dropped) finishes
 DroppedGrey = openpyxl.styles.Font(color="e6e6e6")
-POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+
+# Assign the appropriate styles to the finishes (both str and int forms)
 STYLES = {"1st": boldGold, "2nd": BoldSilver, "3rd": BoldBronze, 1: boldGold, 2: BoldSilver, 3: BoldBronze}
 
-DROPPED_WEEKS = 4
+# Points dictionary Finish(int): points for that finish(int)
+POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+
+# CONFIG PARAMETER - Number of non-counted weeks in a season.
+DROPPED_WEEKS = 2
 
 
+def get_wb() -> openpyxl.Workbook:
+    """
+    Launches a tkinter file selection dialog - Returns a workbook object else raises an error if there are issues.
 
-def get_wb():
-    """Launches a file selection window. Returns a filepath string or raises a FileNotFoundError if user cancels"""
+    Also prints a simple error message to log.
+    User Cancel or blank selection -> FileNotFoundError
+    User selects invalid file openpyxl can't handle -> NameError
+
+    :return: a valid workbook object for use
+    :raises FileNotFoundError: if the user clicks cancel
+    :raises NameError: if the user selects a file openpyxl can't parse
+    """
+    # this launches a generic tkinter file open dialog in the pwd
     root_window = tkinter.Tk()
     root_window.withdraw()
-
     file_path = tkinter.filedialog.askopenfilename()
+
+    # this will generally trigger if user clicked cancel
     try:
         assert file_path != ''
     except AssertionError:
         print("You did not select a valid file.")
         raise FileNotFoundError
+
+    # This will trigger if the user selected a bad file tha openpyxl can't parse
     try:
         wb = openpyxl.load_workbook(file_path)
     except Exception as e:
         print("error opening workbook")
         print(e)
         raise NameError
+
     return wb
 
 
 class ChampWorkBook(object):
+    """
+    Championship wookbook object - An onpenpyxl workbook representing several championships
+    """
 
-    def __init__(self, wb: openpyxl.Workbook, raw_str: str, summary_str: str):
+    def __init__(self, wb: openpyxl.Workbook, raw_str: str, summary_str: str) -> None:
+        """
+        Initiate the Champ Workbook object.
+
+        Creates lists of the raw input sheets - Summary Sheets and other sheets to ignor and copy across.
+        Creates a blank holder for series objects.
+
+        :param wb: A valid openpyxl workbook containing championship data matching the example format
+        :param raw_str: A string that precedes the series name in each tab full of input date in the input excel doc.
+        :param summary_str: A string that will proceed each output tab name followed by the series name.
+        """
         self.wb = wb
         self.raw_data_sheets = []
         self.raw_str = raw_str
         self.summary_sheets = []
         self.summary_str = summary_str
+        # other sheets are sheets that will be copied across unaltered and otherwise ignored
         self.others_sheets = []
+        # blank list for storing series objects
         self.series = []
+
+        # figure out which sheet objects are of which type then add them to their appropriate lists
         l_raw = len(raw_str)
         l_summary = len(summary_str)
         for sheet in wb.sheetnames:
@@ -60,7 +100,7 @@ class ChampWorkBook(object):
             else:
                 self.others_sheets.append(sheet)
 
-        # Wipe old summary sheets
+        # Wipe old summary sheets since they will be generated anew
         for sheet in self.summary_sheets:
             self.wb.remove(self.wb[sheet])
         self.summary_sheets = []
