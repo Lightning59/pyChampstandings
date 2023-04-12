@@ -7,6 +7,11 @@ import openpyxl
 import openpyxl.worksheet
 import openpyxl.utils
 import openpyxl.styles
+from openpyxl.cell.cell import Cell
+from typing import Tuple, List
+
+# Graphic Range Type Hint
+GraphicRange = Tuple[Tuple[Cell, ...], ...]
 
 # Bold Gold for all counted 1st place finishes - Bold Silver second, Bold-Bronze third, Bold- Black - counted
 # non-podium finishes
@@ -130,9 +135,9 @@ class ChampWorkBook(object):
     def init_out_sheets(self) -> None:
         """
         create any missing blank summary sheets then format all sheets grid framework based on drivers and weeks raced
-        so far.
+        so far. Finally print out all results data.s
 
-        :return: Alters state - New blank sheets created with proper grid formatting
+        :return: Alters state - New results sheets created
         """
 
         # check each raw sheet - create new summary sheet name -If that sheet doesn't already exist create it for real
@@ -149,7 +154,14 @@ class ChampWorkBook(object):
                                   self.series[i].get_num_drivers())
             self.write_data(self.summary_sheets[i], self.series[i])
 
-    def calc_graphic_range(self, sheet, num_racers, num_weeks):
+    def calc_graphic_range(self, sheet: str, num_racers: int, num_weeks: int) -> GraphicRange:
+        """
+        Returns a graphics range for the cells covering the expected display output
+        :param sheet: str of a sheet name
+        :param num_racers: int of number of racers
+        :param num_weeks: int of number of weeks
+        :return: GraphicRange - tuple of tuples of cells
+        """
         # 3 lines worth of headers
         output_height = 3 + num_racers
         # 2X num weeks covers driver and pts column each week then need to add positions
@@ -160,11 +172,13 @@ class ChampWorkBook(object):
         end_letter = openpyxl.utils.cell.get_column_letter(output_width)
         end_cell = end_letter + str(output_height)
         graphic_range = ws['A1':end_cell]
+        print(type(graphic_range[0][0]))
         return graphic_range
 
     def format_out_sheet(self, sheet: str, num_weeks: int, num_racers: int) -> None:
         """
-        This routine alters the sheets in the wb to have the appropriate grid lines and merged cells for all weeks
+        This routine alters the sheets in the wb to have the appropriate grid lines and merged cells for all weeks and
+        all the basic headers and labels - Not drivers names/points or finishes.
 
         :param sheet: a string representing a valid summary worksheet tab in the self.wb openpyxl Workbook object
         :param num_weeks: The number of completed weeks in the corresponding series - Integers 1+
@@ -273,20 +287,33 @@ class ChampWorkBook(object):
                 else:
                     graphic_range[j][i].border = openpyxl.styles.Border(top=thin_black, bottom=thin_black)
 
-        # call routine to write the text into the header cells
+        # call routine to write the text into the header cells - Get series name by stripping summary_
         self.write_basic_headers(sheet, num_weeks, num_racers, sheet.replace("summary_", ''))
 
     def write_basic_headers(self, sheet: str, num_weeks: int, num_racers: int, series_name: str) -> None:
+        """
+        This routine will write the Series name and the week 1, 2, 3 etc headers into the xls sheet
+        :param sheet: string pointing to a valid openpyxl workbook sheet/tab
+        :param num_weeks: int of 1+ representing number of weeks in series.
+        :param num_racers: int of 1+ representing number of racers participating in the series
+        :param series_name: String of the series name for printing out
+        """
+
         graphic_range = self.calc_graphic_range(sheet, num_racers, num_weeks)
+
+        # write the series name in the top left most cell (which is really the big merged-full width centered header)
         graphic_range[0][0].value = series_name
 
+        # set up gold silver and bronze backgrounds for top three in points columns
         gold_fill = openpyxl.styles.PatternFill(start_color='FFD700', end_color='FFD700',
-                                                fill_type='solid')  # change to FFFFFF
+                                                fill_type='solid')
         silver_fill = openpyxl.styles.PatternFill(start_color='C0C0C0', end_color='C0C0C0',
-                                                  fill_type='solid')  # change to FFFFFF
+                                                  fill_type='solid')
         bronze_fill = openpyxl.styles.PatternFill(start_color='CD7F32', end_color='CD7F32',
-                                                  fill_type='solid')  # change to FFFFFF
+                                                  fill_type='solid')
         week = 1
+
+        # find the top left corner of each week subbox then start the writing in all the headers and background colors
         week00cells = self.calc_00_cells(num_weeks)
         for cell_index in week00cells:
             graphic_range[1][cell_index].value = "Week " + str(week)
@@ -360,7 +387,12 @@ class ChampWorkBook(object):
             raise FileNotFoundError
         self.wb.save(file_path)
 
-    def calc_00_cells(self, num_weeks):
+    def calc_00_cells(self, num_weeks: int) -> List[int]:
+        """
+        Calculate the column for the left of each week sub box
+        :param num_weeks: int - number of weeks in the series
+        :return: List of ints - Each int is the index for the leftmost entry for that week (the position column)
+        """
         week00cells = [0]
         for i in range(1, num_weeks):
             week00cells.append(week00cells[i - 1] + 2 + i)
