@@ -382,6 +382,12 @@ class ChampWorkBook(object):
             graphic_range[5][cell_index].fill = bronze_fill
 
     def write_data(self, sheet: str, series: Series) -> None:
+        """
+        Writes all the driver finish data and points into the appropriate cells
+        :param sheet: valid string for an output sheet of the opnepyxl workbook
+        :param series: A calculated and ready for printing series object
+        :return:
+        """
         ws = self.wb[sheet]
         num_weeks = series.get_num_weeks()
         first_cells_lr = self.calc_00_cells(num_weeks)
