@@ -384,23 +384,34 @@ class ChampWorkBook(object):
     def write_data(self, sheet: str, series: Series) -> None:
         """
         Writes all the driver finish data and points into the appropriate cells
-        :param sheet: valid string for an output sheet of the opnepyxl workbook
+        :param sheet: valid string for an output sheet of the openpyxl workbook
         :param series: A calculated and ready for printing series object
-        :return:
+        :return: No return
         """
         ws = self.wb[sheet]
+
+        # get locations for the top left cell that now needs input - Should be the Driver in first each week location
         num_weeks = series.get_num_weeks()
         first_cells_lr = self.calc_00_cells(num_weeks)
         first_cells_vert = 4
 
+        # print week by week then driver by driver
         for week in series.weeks:
             index = week - 1
+            # set the current working cell to the first place driver's name position for the current week
             curr_cell = ws.cell(row=first_cells_vert, column=first_cells_lr[index] + 1)
-            vi = 0
-            driver_pos = 1
+            # set driver index to zero for the first driver - this will then increment to move downsheet per driver.
+            driver_index = 0
+            # Driver position - just the driver index plus 1 since the finish position style list isn't zero indexed
+            driver_pos = driver_index+1
+
+            # iterate over this week's drivers in order
+            # - TODO: Implement a method in series rather than indexing into and internal structure
             for driver in series.weekly_sorted_drivers[index]:
+                # Write Driver's name into cell - TODO: Implement a get_name method on the driver class
                 curr_cell.value = driver.name
-                vi += 1
+
+                # Set color style for pts text then enter the drivers point in that cell (one to right)
                 if driver_pos in [1, 2, 3]:
                     style = STYLES[driver_pos]
                 else:
@@ -408,10 +419,15 @@ class ChampWorkBook(object):
                 points_cell = curr_cell.offset(column=1)
                 points_cell.value = driver.weekly_points[index]
                 points_cell.font = style
+
+                # call the print positions function to continue printing the positions for that week out to the right.
                 self.print_positions(driver, week, points_cell)
 
-                curr_cell = ws.cell(row=first_cells_vert + vi, column=first_cells_lr[index] + 1)
-                driver_pos += 1
+                # move on to the next driver selecting the next cell down
+                driver_index += 1
+                # Driver position - just the driver index plus 1 since the finish position style list isn't zero indexed
+                driver_pos = driver_index + 1
+                curr_cell = ws.cell(row=first_cells_vert + driver_index, column=first_cells_lr[index] + 1)
 
     def print_positions(self, driver, week, start_pos):
         positions = driver.weekly_results[week - 1]
@@ -457,8 +473,6 @@ class ChampWorkBook(object):
         for i in range(1, num_weeks):
             week00cells.append(week00cells[i - 1] + 2 + i)
         return week00cells
-
-
 
 
 class Driver(object):
