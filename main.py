@@ -540,17 +540,24 @@ class ChampWorkBook(object):
             # after writing this result keep stepping the cell to the right for next result
             cell_to_write = cell_to_write.offset(column=1)
 
-    def write_out(self):
+    def write_out(self) -> None:
+        """
+        Launches Tkinter save as window with default out.xlsx Raises error if  user does anything wonky like cancel
+        """
+        # setup tkinter save as where it defaults to excel type files and will save as .xslx even if an extension is not
+        # provided by the user as long as they leave the dropdown on xlsx
         default_extension = ".xlsx"
         default_filename = "out" + default_extension
         file_types = [("Excel files", "*" + default_extension), ("All files", "*.*")]
         file_path = tkinter.filedialog.asksaveasfilename(initialfile=default_filename, filetypes=file_types,
                                                          defaultextension=default_extension)
+        # protect against user clicking cancel
         try:
             assert file_path != ''
         except AssertionError:
             print("You did not select a valid output file.")
             raise FileNotFoundError
+        # then save file if  you haven't crashed by now
         self.wb.save(file_path)
 
     def calc_00_cells(self, num_weeks: int) -> list[int]:
