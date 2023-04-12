@@ -8,10 +8,9 @@ import openpyxl.worksheet
 import openpyxl.utils
 import openpyxl.styles
 from openpyxl.cell.cell import Cell
-from typing import Tuple, List
 
 # Graphic Range Type Hint
-GraphicRange = Tuple[Tuple[Cell, ...], ...]
+GraphicRange = tuple[tuple[Cell, ...], ...]
 
 # Bold Gold for all counted 1st place finishes - Bold Silver second, Bold-Bronze third, Bold- Black - counted
 # non-podium finishes
@@ -66,6 +65,62 @@ def get_wb() -> openpyxl.Workbook:
         raise NameError
 
     return wb
+
+
+class Series(object):
+    def __init__(self, sheet, drop_weeks):
+        self.sheet = sheet
+        self.drivers = []
+        self.weeks = []
+        self.drop_weeks = drop_weeks
+        self.weekly_sorted_drivers = []
+
+    def runcalc(self):
+        self.read_weeks()
+        self.read_drivers()
+        for driver in self.drivers:
+            for week in self.weeks:
+                driver.calc_points_results_by_week(week, self.drop_weeks)
+        for week in self.weeks:
+            self.sort_drivers(week)
+
+    def read_drivers(self):
+        i = 3
+        while True:
+            cell_value = self.sheet.cell(row=1, column=i).value
+            if cell_value is None:
+                break
+            d = Driver(cell_value, i)
+            assert len(self.weeks) != 0
+            d.read_results(self.sheet, len(self.weeks))
+            self.drivers.append(d)
+            i += 1
+
+    def read_weeks(self):
+        i = 2
+        while True:
+            cell_value = self.sheet.cell(row=i, column=1).value
+            if cell_value is None:
+                break
+            self.weeks.append(cell_value)
+            i += 1
+
+    def sort_drivers(self, week):
+        sorted_drivers = self.drivers.copy()
+        # sort by number of points for the week. If that is not enough then sort based on best dropped position
+        # going through all dropped positions as needed. - Need to still add Alpha drivers name last?
+        sorted_drivers = sorted(sorted_drivers,
+                                key=lambda y: [-y.weekly_points[week - 1]] + [y.weekly_dropped[week - 1][p][1] for p in
+                                                                              range(len(y.weekly_dropped[week - 1]))])
+        # currently sorting on DN* = 10000, May need alphabetical drivers name added as final condition
+        # or could make these position object then define the __lt__ for position class?
+        self.weekly_sorted_drivers.append(sorted_drivers)
+
+    def get_num_weeks(self):
+        return len(self.weeks)
+
+    def get_num_drivers(self):
+        return len(self.drivers)
 
 
 class ChampWorkBook(object):
@@ -172,7 +227,6 @@ class ChampWorkBook(object):
         end_letter = openpyxl.utils.cell.get_column_letter(output_width)
         end_cell = end_letter + str(output_height)
         graphic_range = ws['A1':end_cell]
-        print(type(graphic_range[0][0]))
         return graphic_range
 
     def format_out_sheet(self, sheet: str, num_weeks: int, num_racers: int) -> None:
@@ -327,7 +381,7 @@ class ChampWorkBook(object):
             graphic_range[4][cell_index].fill = silver_fill
             graphic_range[5][cell_index].fill = bronze_fill
 
-    def write_data(self, sheet: str, series):
+    def write_data(self, sheet: str, series: Series) -> None:
         ws = self.wb[sheet]
         num_weeks = series.get_num_weeks()
         first_cells_lr = self.calc_00_cells(num_weeks)
@@ -387,7 +441,7 @@ class ChampWorkBook(object):
             raise FileNotFoundError
         self.wb.save(file_path)
 
-    def calc_00_cells(self, num_weeks: int) -> List[int]:
+    def calc_00_cells(self, num_weeks: int) -> list[int]:
         """
         Calculate the column for the left of each week sub box
         :param num_weeks: int - number of weeks in the series
@@ -399,60 +453,6 @@ class ChampWorkBook(object):
         return week00cells
 
 
-class Series(object):
-    def __init__(self, sheet, drop_weeks):
-        self.sheet = sheet
-        self.drivers = []
-        self.weeks = []
-        self.drop_weeks = drop_weeks
-        self.weekly_sorted_drivers = []
-
-    def runcalc(self):
-        self.read_weeks()
-        self.read_drivers()
-        for driver in self.drivers:
-            for week in self.weeks:
-                driver.calc_points_results_by_week(week, self.drop_weeks)
-        for week in self.weeks:
-            self.sort_drivers(week)
-
-    def read_drivers(self):
-        i = 3
-        while True:
-            cell_value = self.sheet.cell(row=1, column=i).value
-            if cell_value is None:
-                break
-            d = Driver(cell_value, i)
-            assert len(self.weeks) != 0
-            d.read_results(self.sheet, len(self.weeks))
-            self.drivers.append(d)
-            i += 1
-
-    def read_weeks(self):
-        i = 2
-        while True:
-            cell_value = self.sheet.cell(row=i, column=1).value
-            if cell_value is None:
-                break
-            self.weeks.append(cell_value)
-            i += 1
-
-    def sort_drivers(self, week):
-        sorted_drivers = self.drivers.copy()
-        # sort by number of points for the week. If that is not enough then sort based on best dropped position
-        # going through all dropped positions as needed. - Need to still add Alpha drivers name last?
-        sorted_drivers = sorted(sorted_drivers,
-                                key=lambda y: [-y.weekly_points[week - 1]] + [y.weekly_dropped[week - 1][p][1] for p in
-                                                                              range(len(y.weekly_dropped[week - 1]))])
-        # currently sorting on DN* = 10000, May need alphabetical drivers name added as final condition
-        # or could make these position object then define the __lt__ for position class?
-        self.weekly_sorted_drivers.append(sorted_drivers)
-
-    def get_num_weeks(self):
-        return len(self.weeks)
-
-    def get_num_drivers(self):
-        return len(self.drivers)
 
 
 class Driver(object):
