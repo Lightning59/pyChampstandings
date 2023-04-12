@@ -142,7 +142,8 @@ class ChampWorkBook(object):
                 self.wb.create_sheet(new_summary)
                 self.summary_sheets.append(new_summary)
 
-        # run each sheet through the grid printing functions so they have all their combined cells and grids set.
+        # run each sheet through the grid printing functions, so they have all their combined cells and grids set.
+        # then write in the calculated results data
         for i in range(len(self.series)):
             self.format_out_sheet(self.summary_sheets[i], self.series[i].get_num_weeks(),
                                   self.series[i].get_num_drivers())
@@ -161,17 +162,27 @@ class ChampWorkBook(object):
         graphic_range = ws['A1':end_cell]
         return graphic_range
 
-    def format_out_sheet(self, sheet: str, num_weeks: int, num_racers: int):
+    def format_out_sheet(self, sheet: str, num_weeks: int, num_racers: int) -> None:
+        """
+        This routine alters the sheets in the wb to have the appropriate grid lines and merged cells for all weeks
+
+        :param sheet: a string representing a valid summary worksheet tab in the self.wb openpyxl Workbook object
+        :param num_weeks: The number of completed weeks in the corresponding series - Integers 1+
+        :param num_racers:  The number of competitors in the series - Integers 1+
+        """
 
         # 3 lines worth of headers
         output_height = 3 + num_racers
         # 2X num weeks covers driver and pts column each week then need to add positions
         output_width = 2 * num_weeks
+        # add 1 column for week 1, 2 for week 2 etc.
         for i in range(num_weeks):
             output_width += i + 1
         ws = self.wb[sheet]
+        # create the top header cell full width
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=output_width)
 
+        # create all the week header merged cells( cols 1-3 for week 1, 4-7 for week2 etc)
         start_week_col = 1
         for i in range(1, num_weeks + 1):
             ws.merge_cells(start_row=2, start_column=start_week_col, end_row=2, end_column=start_week_col + i + 1)
@@ -180,6 +191,7 @@ class ChampWorkBook(object):
                                end_column=start_week_col + 1 + i)
             start_week_col += i + 2
 
+        # Get bottom right cell then create graphic range from top left to bottom right
         end_letter = openpyxl.utils.cell.get_column_letter(output_width)
         end_cell = end_letter + str(output_height)
         graphic_range = ws['A1':end_cell]
@@ -193,12 +205,12 @@ class ChampWorkBook(object):
                 cell.alignment = center_all
                 cell.fill = white_fill
 
+        # setup border styles
         thick_black = openpyxl.styles.Side(border_style='medium', color="000000")
         thin_black = openpyxl.styles.Side(border_style='thin', color="000000")
         thick_all_sides_border = openpyxl.styles.Border(left=thick_black, right=thick_black, top=thick_black,
                                                         bottom=thick_black)
-        # First Two Headers for series and weeks - Set Borders
-
+        # First Two Headers for series name and weeks - Set Borders
         bold14pt = openpyxl.styles.Font(size=14, bold=True)
         bold_only = openpyxl.styles.Font(bold=True)
         for cell in graphic_range[0]:
@@ -229,7 +241,7 @@ class ChampWorkBook(object):
             else:
                 row3[i].border = openpyxl.styles.Border(top=thick_black, bottom=thin_black)
 
-        # format las row ith Thick bottom lin and thin top line otherwise Thick week breaks.
+        # format last row ith Thick bottom line and thin top line otherwise Thick week breaks.
         row_last = graphic_range[output_height - 1]
         for i in range(len(row_last)):
             if i == 0:
@@ -261,9 +273,10 @@ class ChampWorkBook(object):
                 else:
                     graphic_range[j][i].border = openpyxl.styles.Border(top=thin_black, bottom=thin_black)
 
+        # call routine to write the text into the header cells
         self.write_basic_headers(sheet, num_weeks, num_racers, sheet.replace("summary_", ''))
 
-    def write_basic_headers(self, sheet: str, num_weeks: int, num_racers: int, series_name: str):
+    def write_basic_headers(self, sheet: str, num_weeks: int, num_racers: int, series_name: str) -> None:
         graphic_range = self.calc_graphic_range(sheet, num_racers, num_weeks)
         graphic_range[0][0].value = series_name
 
