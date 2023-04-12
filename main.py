@@ -123,6 +123,77 @@ class Series(object):
         return len(self.drivers)
 
 
+class Driver(object):
+    def __init__(self, name, col):
+        self.name = name
+        self.col = col
+        self.all_results = []
+        self.this_week_results = []
+        self.weekly_results = []
+        self.weekly_points = []
+        self.weekly_dropped = []
+
+    def read_results(self, sheet, num_weeks):
+        for i in range(2, num_weeks + 2):
+            self.all_results.append((i - 1, sheet.cell(row=i, column=self.col).value))
+
+    def calc_points_results_by_week(self, num_weeks, drop_weeks):
+        week_results = self.all_results[0:num_weeks]
+        dropped_results = []
+
+        for i in range(len(week_results)):
+            if week_results[i][1] in POINTS.keys():
+                week_results[i] = (week_results[i][0], week_results[i][1], POINTS[week_results[i][1]])
+            else:
+                week_results[i] = (week_results[i][0], week_results[i][1], 0)
+
+        week_results = sorted(week_results, key=lambda y: y[2], reverse=True)
+
+        if num_weeks > drop_weeks:
+            for i in range(len(week_results)):
+                if i < (num_weeks - drop_weeks):
+                    week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 1)
+                else:
+                    week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 0)
+                    dropped_results.append((week_results[i][0], week_results[i][1], week_results[i][2], 0))
+        else:
+            week_results[0] = (week_results[0][0], week_results[0][1], week_results[0][2], 1)
+            for i in range(1, len(week_results)):
+                week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 0)
+                dropped_results.append((week_results[i][0], week_results[i][1], week_results[i][2], 0))
+
+        # Tuple format at this point is (week,position,points for position,dropped?)
+        # make it (week,position_numerical,position for print,points for position, dropped)
+
+        self.create_print_positions(week_results)
+        self.create_print_positions(dropped_results)
+
+        # sort all the dropped results in order of quality as we may need them to break ties.
+        dropped_results = sorted(dropped_results, key=lambda y: y[1])
+        self.weekly_results.append(week_results)
+        self.weekly_dropped.append(dropped_results)
+        score = 0
+        for item in week_results:
+            if item[4] == 1:
+                score += item[3]
+        self.weekly_points.append(score)
+
+    def create_print_positions(self, week_results):
+        """ take in list of Tuples format at this point is (week,position,points for position,dropped?)
+        make it list of tuples (week,position_numerical,position print,points for position, dropped)"""
+        endings_dict = {1: "st", 2: "nd", 3: "rd"}
+        for i in range(len(week_results)):
+            if type(week_results[i][1]) == str:
+                week_results[i] = (week_results[i][0], 1000, week_results[i][1], week_results[i][2], week_results[i][3])
+            elif week_results[i][1] in endings_dict.keys():
+                week_results[i] = (
+                    week_results[i][0], week_results[i][1], str(week_results[i][1]) + endings_dict[week_results[i][1]],
+                    week_results[i][2], week_results[i][3])
+            else:
+                week_results[i] = (week_results[i][0], week_results[i][1], str(week_results[i][1]) + 'th',
+                                   week_results[i][2], week_results[i][3])
+
+
 class ChampWorkBook(object):
     """
     Championship wookbook object - An onpenpyxl workbook representing several championships
@@ -396,6 +467,7 @@ class ChampWorkBook(object):
         first_cells_vert = 4
 
         # print week by week then driver by driver
+        # TODO: Implement a get_weeks method
         for week in series.weeks:
             index = week - 1
             # set the current working cell to the first place driver's name position for the current week
@@ -417,8 +489,10 @@ class ChampWorkBook(object):
                 else:
                     style = BoldBlack
                 points_cell = curr_cell.offset(column=1)
+                # TODO: Implement a get points by week method
                 points_cell.value = driver.weekly_points[index]
                 points_cell.font = style
+                print(type(points_cell))
 
                 # call the print positions function to continue printing the positions for that week out to the right.
                 self.print_positions(driver, week, points_cell)
@@ -429,9 +503,22 @@ class ChampWorkBook(object):
                 driver_pos = driver_index + 1
                 curr_cell = ws.cell(row=first_cells_vert + driver_index, column=first_cells_lr[index] + 1)
 
-    def print_positions(self, driver, week, start_pos):
+    def print_positions(self, driver: Driver, week: int, start_pos: Cell) -> None:
+        """
+        Prints formatted text of all the drivers finishes for a given week starting one cell right of the passed cell
+        :param driver: A valid championship Driver object
+        :param week: an int of which week we want results for (human-readable starting at 1 not at 0)
+        :param start_pos: openpyxl Cell object just left of where the first position will be printed (The points cell)
+        """
+
+        # TODO - Implement a get results by week method
+        # get the lists of drivers positions sorted by the week they occurred
         positions = driver.weekly_results[week - 1]
         positions = sorted(positions, key=lambda y: y[0])
+
+        # move one cell right as this is the first place we want to print
+        # TODO consider moving this to the code in the funciton that will call this one so this starts in the passed in
+        #   cell
         cell_to_write = start_pos.offset(column=1)
         for pos in positions:
             # if the position is a dropped result
@@ -440,14 +527,17 @@ class ChampWorkBook(object):
                 cell_to_write.font = style
                 cell_to_write.value = pos[2]
             else:
+                # if not dropped is it a podium result - if so fancy formatting applied
                 if pos[2] in STYLES.keys():
                     style = STYLES[pos[2]]
                     cell_to_write.font = style
                     cell_to_write.value = pos[2]
                 else:
+                    # Otherwise standard black will be written
                     style = BoldBlack
                     cell_to_write.font = style
                     cell_to_write.value = pos[2]
+            # after writing this result keep stepping the cell to the right for next result
             cell_to_write = cell_to_write.offset(column=1)
 
     def write_out(self):
@@ -473,77 +563,6 @@ class ChampWorkBook(object):
         for i in range(1, num_weeks):
             week00cells.append(week00cells[i - 1] + 2 + i)
         return week00cells
-
-
-class Driver(object):
-    def __init__(self, name, col):
-        self.name = name
-        self.col = col
-        self.all_results = []
-        self.this_week_results = []
-        self.weekly_results = []
-        self.weekly_points = []
-        self.weekly_dropped = []
-
-    def read_results(self, sheet, num_weeks):
-        for i in range(2, num_weeks + 2):
-            self.all_results.append((i - 1, sheet.cell(row=i, column=self.col).value))
-
-    def calc_points_results_by_week(self, num_weeks, drop_weeks):
-        week_results = self.all_results[0:num_weeks]
-        dropped_results = []
-
-        for i in range(len(week_results)):
-            if week_results[i][1] in POINTS.keys():
-                week_results[i] = (week_results[i][0], week_results[i][1], POINTS[week_results[i][1]])
-            else:
-                week_results[i] = (week_results[i][0], week_results[i][1], 0)
-
-        week_results = sorted(week_results, key=lambda y: y[2], reverse=True)
-
-        if num_weeks > drop_weeks:
-            for i in range(len(week_results)):
-                if i < (num_weeks - drop_weeks):
-                    week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 1)
-                else:
-                    week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 0)
-                    dropped_results.append((week_results[i][0], week_results[i][1], week_results[i][2], 0))
-        else:
-            week_results[0] = (week_results[0][0], week_results[0][1], week_results[0][2], 1)
-            for i in range(1, len(week_results)):
-                week_results[i] = (week_results[i][0], week_results[i][1], week_results[i][2], 0)
-                dropped_results.append((week_results[i][0], week_results[i][1], week_results[i][2], 0))
-
-        # Tuple format at this point is (week,position,points for position,dropped?)
-        # make it (week,position_numerical,position for print,points for position, dropped)
-
-        self.create_print_positions(week_results)
-        self.create_print_positions(dropped_results)
-
-        # sort all the dropped results in order of quality as we may need them to break ties.
-        dropped_results = sorted(dropped_results, key=lambda y: y[1])
-        self.weekly_results.append(week_results)
-        self.weekly_dropped.append(dropped_results)
-        score = 0
-        for item in week_results:
-            if item[4] == 1:
-                score += item[3]
-        self.weekly_points.append(score)
-
-    def create_print_positions(self, week_results):
-        """ take in list of Tuples format at this point is (week,position,points for position,dropped?)
-        make it list of tuples (week,position_numerical,position print,points for position, dropped)"""
-        endings_dict = {1: "st", 2: "nd", 3: "rd"}
-        for i in range(len(week_results)):
-            if type(week_results[i][1]) == str:
-                week_results[i] = (week_results[i][0], 1000, week_results[i][1], week_results[i][2], week_results[i][3])
-            elif week_results[i][1] in endings_dict.keys():
-                week_results[i] = (
-                    week_results[i][0], week_results[i][1], str(week_results[i][1]) + endings_dict[week_results[i][1]],
-                    week_results[i][2], week_results[i][3])
-            else:
-                week_results[i] = (week_results[i][0], week_results[i][1], str(week_results[i][1]) + 'th',
-                                   week_results[i][2], week_results[i][3])
 
 
 if __name__ == '__main__':
